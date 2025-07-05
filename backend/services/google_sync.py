@@ -28,7 +28,8 @@ async def sync_google_fit_data(user: User, db, days_back: int = 1):
                 response = await client.post(
                     GOOGLE_FIT_API_URL,
                     headers=headers,
-                    json=build_request_body(data_type, start_millis, end_millis)
+                    json=build_request_body(data_type, start_millis, end_millis),
+                    timeout=30.0
                     
                 )
                 print(f"Fetching {key} → status {response.status_code}")
@@ -198,20 +199,25 @@ async def sync_google_fit_data(user: User, db, days_back: int = 1):
 
                                 # Store only meaningful sleep stages and skip unknown/awake if needed
                                 if sleep_stage in [2, 3, 4] and sleep_duration > 0:
-                                    exists = await db.execute(
-                                        select(HealthData).where(
-                                            HealthData.user_id == user.id,
-                                            HealthData.metric_type == key,
-                                            HealthData.timestamp == ts_dt
+                                    start_dt = datetime.fromtimestamp(start_nanos / 1e9, tz=timezone.utc).replace(microsecond=0)
+                                    end_dt = datetime.fromtimestamp(end_nanos / 1e9, tz=timezone.utc).replace(microsecond=0)
+
+                                    # Optional deduplication for sessions
+                                    session_exists = await db.execute(
+                                        select(SleepSession).where(
+                                            SleepSession.user_id == user.id,
+                                            SleepSession.start_time == start_dt,
+                                            SleepSession.end_time == end_dt,
                                         )
                                     )
-                                    if not exists.scalars().first():
-                                        db.add(HealthData(
+                                    if not session_exists.scalars().first():
+                                        db.add(SleepSession(
                                             user_id=user.id,
-                                            metric_type=key,
-                                            value=round(sleep_duration, 2),
-                                            timestamp=ts_dt
+                                            start_time=start_dt,
+                                            end_time=end_dt,
+                                            duration_hours=round(sleep_duration, 2),
                                         ))
+
 
                             elif key == "distance":
                                 raw_val = point["value"][0]

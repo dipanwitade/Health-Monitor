@@ -15,6 +15,8 @@ from services.google_sync import sync_google_fit_data
 
 from pydantic import BaseModel
 
+import pytz
+
 router = APIRouter()
 
 # @router.get("/health-data")
@@ -252,17 +254,34 @@ async def get_today_health_data(
         raise HTTPException(status_code=404, detail="User not found")
 
     # Define today's date range (UTC)
-    now = datetime.utcnow()
-    start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    sleep_start = now.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(hours=8)
+    # now = datetime.utcnow()
+    # start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    # sleep_start = now.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(hours=8)
+
+
+     # ⏰ Step 1: Compute time range based on IST
+    india_tz = pytz.timezone("Asia/Kolkata")
+    today_ist = datetime.now(india_tz).date()
+
+
+    
+    # IST midnight → UTC range
+    ist_start = india_tz.localize(datetime.combine(today_ist, datetime.min.time()))
+    ist_end = india_tz.localize(datetime.combine(today_ist, datetime.max.time()))
+    start_utc = ist_start.astimezone(timezone.utc)
+    end_utc = ist_end.astimezone(timezone.utc)
+ 
+    
 
     # Fetch today's data from DB
     result = await db.execute(
         select(HealthData).where(
             HealthData.user_id == user.id,
-            # HealthData.timestamp >= start_of_day,
-            HealthData.timestamp >= sleep_start,
-            HealthData.timestamp <= now
+            # HealthData.timestamp >= start_of_day,     #OLD VERSION
+            # HealthData.timestamp >= sleep_start,      #NEW VERSION
+            HealthData.timestamp >= start_utc,
+            # HealthData.timestamp <= now
+            HealthData.timestamp <= end_utc
         )
     )
    
@@ -383,7 +402,7 @@ async def get_sleep_sessions(user_email: str, days: int = 7, db: AsyncSession = 
                 "date": s.start_time.date().isoformat(),
                 "start_time": s.start_time.isoformat(),
                 "end_time": s.end_time.isoformat(),
-                "duration_minutes": s.duration_minutes
+                "duration_minutes": s.duration_minutes or round(s.duration_hours * 60, 2)
             } for s in sessions
         ]
     }
@@ -398,10 +417,21 @@ async def get_health_data_history(
     db: AsyncSession = Depends(get_db),
 ):
     try:
-        # start_dt = datetime.strptime(start_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
-        start_dt = datetime.strptime(start_date, "%Y-%m-%d")
-        # end_dt = datetime.strptime(end_date, "%Y-%m-%d").replace(hour=23, minute=59, second=59, tzinfo=timezone.utc)
-        end_dt = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)
+        # # start_dt = datetime.strptime(start_date, "%Y-%m-%d").replace(tzinfo=timezone.utc) #OLD VERSION
+        # start_dt = datetime.strptime(start_date, "%Y-%m-%d")                                #NEW VERSION
+        # # end_dt = datetime.strptime(end_date, "%Y-%m-%d").replace(hour=23, minute=59, second=59, tzinfo=timezone.utc) #OLD VERSION
+        # end_dt = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)                #NEW VERSION
+
+        india_tz = pytz.timezone("Asia/Kolkata")
+
+        # Convert local IST dates to UTC-aware datetime ranges
+        local_start = datetime.strptime(start_date, "%Y-%m-%d")
+        local_end = datetime.strptime(end_date, "%Y-%m-%d")
+
+        # Localize to IST and convert to UTC
+        start_dt = india_tz.localize(local_start).astimezone(timezone.utc)
+        end_dt = india_tz.localize(local_end.replace(hour=23, minute=59, second=59)).astimezone(timezone.utc)
+
         if start_dt > end_dt:
             raise HTTPException(status_code=400, detail="start_date must be before end_date.")
     except ValueError:
@@ -450,8 +480,8 @@ async def get_health_data_history(
             distance.append({"timestamp": ts, "value": rec.value})
         elif rec.metric_type == "calories":
             calories.append({"timestamp": ts, "value": rec.value})
-        # elif rec.metric_type == "sleep":
-        #     sleep.append({"timestamp": ts, "value": rec.value})
+        elif rec.metric_type == "sleep":
+            sleep.append({"timestamp": ts, "value": rec.value})
         elif rec.metric_type == "stress":
             stress.append({"timestamp": ts, "value": rec.value})
 
@@ -500,7 +530,7 @@ async def get_health_data_history(
         "steps": steps,
         "distance": distance,
         "calories": calories,
-        # "sleep": sleep,
+        "sleep": sleep,
         "stress": stress,
         "averageMetrics": averageMetrics
     }

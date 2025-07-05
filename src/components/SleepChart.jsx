@@ -1,8 +1,7 @@
 import React from "react";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LabelList } from "recharts";
 import { format, parseISO } from "date-fns";
 
-const formatDuration = (minutes) => (minutes / 60).toFixed(1); // hours
 
 const CustomTooltip = ({ active, payload, label }) => {
   if (active && payload?.length) {
@@ -13,7 +12,7 @@ const CustomTooltip = ({ active, payload, label }) => {
     return (
       <div className="bg-white p-2 shadow rounded text-sm">
         <p className="font-semibold">{label}</p>
-        <p>🛏 {formatDuration(session.duration_minutes)} hrs</p>
+        <p>🛏 {session.duration.toFixed(1)} hrs</p>
         <p>🕒 {start} → {end}</p>
       </div>
     );
@@ -22,10 +21,10 @@ const CustomTooltip = ({ active, payload, label }) => {
   return null;
 };
 
-const WeeklySleepChart = ({ sleepSessions }) => {
+const SleepChart = ({ sleepSessions }) => {
   const data = sleepSessions.map((session) => ({
     day: format(parseISO(session.date), "EEE"),
-    duration: parseFloat(formatDuration(session.duration_minutes)),
+    duration: parseFloat((session.duration_minutes / 60).toFixed(1)), // convert to hours
     ...session
   }));
 
@@ -36,13 +35,16 @@ const WeeklySleepChart = ({ sleepSessions }) => {
         <BarChart data={data}>
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis dataKey="day" />
-          <YAxis unit="h" />
+          <YAxis unit="h" domain={[0, 12]} />
           <Tooltip content={<CustomTooltip />} />
-          <Bar dataKey="duration" fill="#6D28D9" radius={[4, 4, 0, 0]} />
+          <Bar dataKey="duration" fill="#4f46e5" radius={[4, 4, 0, 0]}>
+            <LabelList dataKey="duration" position="top" formatter={(val) => `${val}h`} />
+          </Bar>
         </BarChart>
       </ResponsiveContainer>
     </div>
   );
 };
 
-export default WeeklySleepChart;
+
+export default SleepChart;

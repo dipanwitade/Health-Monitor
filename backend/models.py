@@ -51,7 +51,9 @@ class HealthData(Base):
     timestamp = Column(DateTime, default=datetime.utcnow)
     hash = Column(String, nullable=True, index=True)
 
-    user = relationship("User", back_populates="health_data")
+    user = relationship("User", back_populates="healt" \
+    "" \
+    "h_data")
 
 
 class SleepSession(Base):

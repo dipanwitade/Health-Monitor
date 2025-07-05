@@ -16,8 +16,8 @@ import HealthChart from "../components/HealthChart";
 import GroupedHealthCards from "../components/GroupedHealthCards";
 import { iconMap } from "../constants/iconMap";
 
-import SleepBarChart from "../components/SleepBarChart";
-import WeeklySleepChart from "../components/WeeklySleepChart";
+
+import SleepChart from "../components/SleepChart";
 
 
 
@@ -227,12 +227,25 @@ const Dashboard = () => {
 
       try {
         if (period === "Today") {
-          const startDate = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+
+
+          // const startDate = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+
+
+          // Convert to IST (UTC+5:30)
+          const now = new Date();
+          const offsetMs = 5.5 * 60 * 60 * 1000; // 5:30 in milliseconds
+          const istNow = new Date(now.getTime() + offsetMs);
+          const startDate = istNow.toISOString().split("T")[0];
+
+
 
           const res = await axios.get("http://localhost:8000/healthdata/history", {
-            params: { user_email: email },
-            start_date: startDate,
-            end_date: startDate,
+            params: {
+              user_email: email,
+              start_date: startDate,
+              end_date: startDate,
+            }
           });
 
           const data = res.data;
@@ -276,12 +289,17 @@ const Dashboard = () => {
 
         } else {
           if (period === "Yesterday") {
+
             // const y = new Date();
             // y.setDate(y.getDate() - 1);
             // startDate = y.toISOString().split("T")[0];
-            const y = new Date();
-            y.setDate(y.getDate() - 1);
-            startDate = y.toISOString().split("T")[0];
+
+            const now = new Date();
+            const offsetMs = 5.5 * 60 * 60 * 1000;
+            const istNow = new Date(now.getTime() + offsetMs);
+            istNow.setDate(istNow.getDate() - 1);
+            const startDate = istNow.toISOString().split("T")[0];
+
 
 
           } else if (period === "Custom") {
@@ -410,15 +428,15 @@ const Dashboard = () => {
           color="red"
         /> */}
 
-<LineChartPanel
-  title="Blood Pressure Trend"
-  data={history.blood_pressure.map((d) => ({
-    systolic: d.systolic,
-    diastolic: d.diastolic,
-    timestamp: d.timestamp,  // ⬅️ keep raw ISO timestamp
-  }))}
-  color="red"
-/>
+        <LineChartPanel
+          title="Blood Pressure Trend"
+          data={history.blood_pressure.map((d) => ({
+            systolic: d.systolic,
+            diastolic: d.diastolic,
+            timestamp: d.timestamp,  // ⬅️ keep raw ISO timestamp
+          }))}
+          color="red"
+        />
 
 
 
@@ -427,8 +445,8 @@ const Dashboard = () => {
         <LineChartPanel title="Stress Trend" data={history.stress} unit="level" />
       </div>
 
-      <SleepBarChart email={email} />
-      <WeeklySleepChart sleepSessions={sleepSessions} />
+      <SleepChart sleepSessions={sleepSessions} />
+
       <div className="min-h-[40px] text-center">
         <p className="text-sm text-gray-500 mt-2">Last updated at: {new Date().toLocaleTimeString()}</p>
       </div>
