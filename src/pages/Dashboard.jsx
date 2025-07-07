@@ -61,7 +61,7 @@ const Dashboard = () => {
 
   const getSum = (data) => {
     if (!data || data.length === 0) return "--";
-    const sum = data.reduce((acc, val) => acc + (val.value || 0), 0);
+    const sum = data.reduce((acc, val) => acc + (val.value || val.duration_hours || 0), 0);
     return Math.round(sum);
   };
 

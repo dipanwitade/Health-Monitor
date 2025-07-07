@@ -285,6 +285,48 @@ async def sync_google_fit_data(user: User, db, days_back: int = 1):
                                         timestamp=ts_dt
                                     ))
 
+            # 💤 Additional fetch using sessions API for complete sleep data
+            session_url = "https://www.googleapis.com/fitness/v1/users/me/sessions"
+
+            session_res = await client.get(
+                session_url,
+                headers=headers,
+                params={
+                    "startTime": start_time.isoformat() + "Z",
+                    "endTime": end_time.isoformat() + "Z"
+                },
+                timeout=30.0
+            )
+
+            if session_res.status_code == 200:
+                sessions = session_res.json().get("session", [])
+                for s in sessions:
+                    if s.get("activityType") != 72:  # 72 = Sleep
+                        continue
+
+                    start_ts = int(s["startTimeMillis"]) / 1000
+                    end_ts = int(s["endTimeMillis"]) / 1000
+                    start_dt = datetime.fromtimestamp(start_ts, tz=timezone.utc).replace(microsecond=0)
+                    end_dt = datetime.fromtimestamp(end_ts, tz=timezone.utc).replace(microsecond=0)
+                    duration_hours = round((end_ts - start_ts) / 3600, 2)
+
+                    # Deduplication check
+                    session_exists = await db.execute(
+                        select(SleepSession).where(
+                            SleepSession.user_id == user.id,
+                            SleepSession.start_time == start_dt,
+                            SleepSession.end_time == end_dt,
+                        )
+                    )
+                    if not session_exists.scalars().first():
+                        db.add(SleepSession(
+                            user_id=user.id,
+                            start_time=start_dt,
+                            end_time=end_dt,
+                            duration_hours=duration_hours
+                        ))
+
+
 
 
 

@@ -402,7 +402,9 @@ async def get_sleep_sessions(user_email: str, days: int = 7, db: AsyncSession = 
                 "date": s.start_time.date().isoformat(),
                 "start_time": s.start_time.isoformat(),
                 "end_time": s.end_time.isoformat(),
-                "duration_minutes": s.duration_minutes or round(s.duration_hours * 60, 2)
+                "duration_hours": s.duration_hours,
+                # "duration_minutes": s.duration_minutes or round(s.duration_hours * 60, 2)
+                "duration_minutes": round(s.duration_hours * 60, 2)
             } for s in sessions
         ]
     }
