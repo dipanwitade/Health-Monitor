@@ -19,6 +19,14 @@ import { iconMap } from "../constants/iconMap";
 
 import SleepChart from "../components/SleepChart";
 
+const formatDuration = (totalHours) => {
+  if (!totalHours || totalHours === "--") return "--";
+  const hours = Math.floor(totalHours);
+  const minutes = Math.round((totalHours - hours) * 60);
+  return `${hours}h ${minutes}m`;
+};
+
+
 
 
 const Dashboard = () => {
@@ -226,6 +234,14 @@ const Dashboard = () => {
       });
 
       try {
+        const sleepSessionRes = await axios.get("http://localhost:8000/sleep-sessions", {
+          params: {
+            user_email: email,
+            days: 7
+          }
+        });
+        setSleepSessions(sleepSessionRes.data.sleep_sessions); // ⬅ Make sure you’ve defined this state
+
         if (period === "Today") {
 
 
@@ -276,11 +292,23 @@ const Dashboard = () => {
             heart_rate: data.heart_rate?.length ? getAverage(data.heart_rate) : "--",
             spo2: data.spo2?.length ? getAverage(data.spo2) : "--",
             blood_pressure: data.blood_pressure?.length ? getAverageBP(data.blood_pressure) : "--",
-            sleep: data.sleep?.length ? getSum(data.sleep) : "--",
             stress: data.stress?.length ? getAverage(data.stress) : "--",
             steps: data.steps?.length ? getSum(data.steps) : "--",
             calories: data.calories?.length ? getSum(data.calories) : "--",
             distance: data.distance?.length ? getSum(data.distance) : "--",
+            // sleep: data.sleep?.length ? getSum(data.sleep) : "--",
+            // sleep: data.sleep?.length ? getSum(sleepSessionRes.data.sleep_sessions) : "--",
+            sleep: (() => {
+              const today = new Date();
+              today.setHours(0, 0, 0, 0);
+              const filteredSleepSessions = sleepSessionRes.data.sleep_sessions.filter(session => {
+                const sessionDate = new Date(session.start_time);
+                sessionDate.setHours(0, 0, 0, 0);
+                return sessionDate.getTime() === today.getTime();
+              });
+              return filteredSleepSessions.length ? formatDuration(getSum(filteredSleepSessions)) : "--";
+            })(),
+
 
           });
 
@@ -288,6 +316,7 @@ const Dashboard = () => {
 
 
         } else {
+          let startDate;
           if (period === "Yesterday") {
 
             // const y = new Date();
@@ -298,7 +327,7 @@ const Dashboard = () => {
             const offsetMs = 5.5 * 60 * 60 * 1000;
             const istNow = new Date(now.getTime() + offsetMs);
             istNow.setDate(istNow.getDate() - 1);
-            const startDate = istNow.toISOString().split("T")[0];
+            startDate = istNow.toISOString().split("T")[0];
 
 
 
@@ -318,10 +347,10 @@ const Dashboard = () => {
           });
 
           const data = res.data;
-          console.log("Fetched history data:", data);
-          console.log("[🚦 Dashboard] period:", period, "→ startDate:", startDate);
+          // console.log("Fetched history data:", data);
+          // console.log("[🚦 Dashboard] period:", period, "→ startDate:", startDate);
 
-          console.log("[🩸 BP Raw from DB]", history.blood_pressure);
+          // console.log("[🩸 BP Raw from DB]", history.blood_pressure);
 
           setHistory({
             heart_rate: data.heart_rate || [],
@@ -341,18 +370,22 @@ const Dashboard = () => {
             steps: getSum(data.steps),
             distance: getSum(data.distance),
             calories: getSum(data.calories),
-            sleep: getSum(data.sleep),
             stress: getAverage(data.stress),
+            // sleep: getSum(sleepSessionRes.data.sleep_sessions),
+            sleep: (() => {
+              const target = new Date(startDate);
+              target.setHours(0, 0, 0, 0);
+              const filteredSleepSessions = sleepSessionRes.data.sleep_sessions.filter(session => {
+                const sessionDate = new Date(session.start_time);
+                sessionDate.setHours(0, 0, 0, 0);
+                return sessionDate.getTime() === target.getTime();
+              });
+              return filteredSleepSessions.length ? formatDuration(getSum(filteredSleepSessions)) : "--";
+            })(),
+
           });
         }
         // 🟨 Fetch Sleep Sessions for bar chart (7-day graph)
-        const sleepSessionRes = await axios.get("http://localhost:8000/sleep-sessions", {
-          params: {
-            user_email: email,
-            days: 7
-          }
-        });
-        setSleepSessions(sleepSessionRes.data.sleep_sessions); // ⬅ Make sure you’ve defined this state
 
       } catch (err) {
         console.error("History DB fetch error:", err);
@@ -441,7 +474,7 @@ const Dashboard = () => {
 
 
 
-        <LineChartPanel title="Sleep Trend" data={history.sleep} unit="hrs" />
+        {/* <LineChartPanel title="Sleep Trend" data={history.sleep} unit="hrs" /> */}
         <LineChartPanel title="Stress Trend" data={history.stress} unit="level" />
       </div>
 

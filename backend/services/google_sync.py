@@ -508,4 +508,3 @@ async def sync_google_fit_data(user: User, db, days_back: int = 1):
 #     await db.commit()
 
 
-#this a new
