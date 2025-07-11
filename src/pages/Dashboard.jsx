@@ -19,6 +19,8 @@ import { iconMap } from "../constants/iconMap";
 
 import SleepChart from "../components/SleepChart";
 
+import AiInsightCard from "../components/AiInsightCard";
+
 const formatDuration = (totalHours) => {
   if (!totalHours || totalHours === "--") return "--";
   const hours = Math.floor(totalHours);
@@ -66,6 +68,9 @@ const Dashboard = () => {
     sleep: "--",
     stress: "--"
   });
+
+  const [aiInsight, setAiInsight] = useState(null);
+
 
   const getSum = (data) => {
     if (!data || data.length === 0) return "--";
@@ -396,6 +401,51 @@ const Dashboard = () => {
   }, [period, customStart]);
 
 
+  useEffect(() => {
+  const fetchAnomalyInsight = async () => {
+    try {
+      const { heart_rate, spo2, blood_pressure } = averageMetrics;
+
+      if (
+        !heart_rate || heart_rate === "--" ||
+        !spo2 || spo2 === "--" ||
+        !blood_pressure || typeof blood_pressure !== "string" ||
+        !blood_pressure.includes("/")
+      ) {
+        console.log("⚠️ Skipping AI check: missing or invalid metrics");
+        return;
+      }
+
+      // Parse blood pressure string like "120/80"
+      const [systolicStr, diastolicStr] = blood_pressure.split("/");
+      const systolic = parseInt(systolicStr);
+      const diastolic = parseInt(diastolicStr);
+
+      const response = await fetch("http://localhost:8000/ai/anomaly", {
+
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          heart_rate,
+          spo2,
+          systolic_bp: systolic,
+          diastolic_bp: diastolic,
+        }),
+      });
+
+      const data = await response.json();
+      setAiInsight(data);
+    } catch (error) {
+      console.error("AI Insight error:", error);
+    }
+  };
+
+  fetchAnomalyInsight();
+}, [averageMetrics]);
+
+
+
+
 
 
 
@@ -431,6 +481,14 @@ const Dashboard = () => {
           </div>
         </div>
       )}
+
+      {aiInsight?.result === "no_data" ? (
+  <p className="text-sm text-gray-400">Not enough data to generate insight.</p>
+) : (
+  aiInsight && <AiInsightCard result={aiInsight.result} score={aiInsight.score} />
+)}
+
+
 
       {/* Health Cards */}
 
