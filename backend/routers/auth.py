@@ -34,7 +34,12 @@ async def signup(user: UserCreate, db: AsyncSession = Depends(get_db)):
     new_user = User(
         name=user.name,
         email=user.email,
-        password=hashed_password.decode('utf-8')
+        password=hashed_password.decode('utf-8'),
+        age=user.age,
+        gender=user.gender,
+        phone=user.phone,
+        country=user.country,
+        role=user.role
     )
     db.add(new_user)
     await db.commit()

@@ -401,35 +401,39 @@ const Dashboard = () => {
   }, [period, customStart]);
 
 
+
+  
+
   useEffect(() => {
   const fetchAnomalyInsight = async () => {
+    const hr = parseFloat(averageMetrics.heart_rate);
+    const spo2 = parseFloat(averageMetrics.spo2);
+
+    let sys, dia;
+    if (typeof averageMetrics.blood_pressure === "string" && averageMetrics.blood_pressure.includes("/")) {
+      const parts = averageMetrics.blood_pressure.split("/");
+      sys = parseFloat(parts[0]);
+      dia = parseFloat(parts[1]);
+    }
+
+    // ✅ Skip if any value is missing or "--"
+    if (
+      isNaN(hr) || isNaN(spo2) || isNaN(sys) || isNaN(dia)
+    ) {
+      console.warn("⚠️ Skipping AI check: missing or invalid metrics");
+      setAiInsight(null); // 🚫 Reset insight
+      return;
+    }
+
     try {
-      const { heart_rate, spo2, blood_pressure } = averageMetrics;
-
-      if (
-        !heart_rate || heart_rate === "--" ||
-        !spo2 || spo2 === "--" ||
-        !blood_pressure || typeof blood_pressure !== "string" ||
-        !blood_pressure.includes("/")
-      ) {
-        console.log("⚠️ Skipping AI check: missing or invalid metrics");
-        return;
-      }
-
-      // Parse blood pressure string like "120/80"
-      const [systolicStr, diastolicStr] = blood_pressure.split("/");
-      const systolic = parseInt(systolicStr);
-      const diastolic = parseInt(diastolicStr);
-
       const response = await fetch("http://localhost:8000/ai/anomaly", {
-
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          heart_rate,
-          spo2,
-          systolic_bp: systolic,
-          diastolic_bp: diastolic,
+          heart_rate: hr,
+          spo2: spo2,
+          systolic_bp: sys,
+          diastolic_bp: dia,
         }),
       });
 
@@ -437,11 +441,16 @@ const Dashboard = () => {
       setAiInsight(data);
     } catch (error) {
       console.error("AI Insight error:", error);
+      setAiInsight(null);
     }
   };
 
   fetchAnomalyInsight();
 }, [averageMetrics]);
+
+
+
+
 
 
 
@@ -482,11 +491,23 @@ const Dashboard = () => {
         </div>
       )}
 
-      {aiInsight?.result === "no_data" ? (
-  <p className="text-sm text-gray-400">Not enough data to generate insight.</p>
-) : (
-  aiInsight && <AiInsightCard result={aiInsight.result} score={aiInsight.score} />
-)}
+      {/* {aiInsight?.result === "no_data" ? (
+        <p className="text-sm text-gray-400">Not enough data to generate insight.</p>
+      ) : (
+        aiInsight && <AiInsightCard result={aiInsight.result} score={aiInsight.score} />
+      )} */}
+
+      {aiInsight?.result === "normal" && (
+        <AiInsightCard result="normal" score={aiInsight.score} />
+      )}
+      {aiInsight?.result === "anomaly" && (
+        <AiInsightCard result="anomaly" score={aiInsight.score} />
+      )}
+      {aiInsight?.result === "no_data" && (
+        <AiInsightCard result="no_data" />
+      )}
+
+
 
 
 
