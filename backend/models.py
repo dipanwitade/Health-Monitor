@@ -21,11 +21,11 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     profile_pic = Column(String, nullable=True)
     password = Column(String, nullable=True)
-    age = Column(Integer, nullable=False)
-    gender = Column(String, nullable=False)
-    phone = Column(String, nullable=False)
-    country = Column(String, nullable=False)
-    role = Column(String, nullable=False)
+    age = Column(Integer, nullable=True)
+    gender = Column(String, nullable=True)
+    phone = Column(String, nullable=True)
+    country = Column(String, nullable=True)
+    role = Column(String, default="Patient")
 
     # ➕ Add these new columns:
     access_token = Column(String, nullable=True)

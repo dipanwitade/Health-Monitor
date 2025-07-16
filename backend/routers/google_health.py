@@ -10,7 +10,7 @@ from typing import List, Optional
 import json
 from .google_auth import GOOGLE_FIT_API_URL, DATA_TYPES, build_request_body  # Adjust if needed
 from sqlalchemy import and_,func
-
+from schemas import UserUpdate
 from services.google_sync import sync_google_fit_data
 
 from pydantic import BaseModel
@@ -540,6 +540,35 @@ async def get_health_data_history(
 
 
 
+@router.put("/users/update")
+async def update_user_profile(update_data: UserUpdate, db: AsyncSession = Depends(get_db)):
+    try:
+        # Get the existing user by email
+        result = await db.execute(select(User).where(User.email == update_data.email))
+        user = result.scalar_one_or_none()
+
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Update only the fields provided
+        if update_data.age is not None:
+            user.age = update_data.age
+        if update_data.gender is not None:
+            user.gender = update_data.gender
+        if update_data.phone is not None:
+            user.phone = update_data.phone
+        if update_data.country is not None:
+            user.country = update_data.country
+        if update_data.role is not None:
+            user.role = update_data.role
+
+        await db.commit()
+        await db.refresh(user)
+
+        return {"message": "User profile updated successfully"}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Update failed: {str(e)}")
 
 
 

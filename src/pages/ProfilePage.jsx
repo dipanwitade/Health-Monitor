@@ -74,6 +74,7 @@ const ProfilePage = () => {
 
   const [editing, setEditing] = useState(false);
   const [message, setMessage] = useState("");
+  const [originalUser, setOriginalUser] = useState({});
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -86,6 +87,9 @@ const ProfilePage = () => {
           ...userData,
           role: userData.role || "Patient",
         }));
+        console.log("Fetched user:", userData);
+
+        setOriginalUser(userData);
       } catch (err) {
         console.error("Failed to load profile:", err);
       }
@@ -109,11 +113,21 @@ const ProfilePage = () => {
         role: user.role,
       });
       setMessage("Profile updated successfully!");
+      setOriginalUser(user); // Update backup
       setEditing(false);
     } catch (err) {
       console.error("Profile update failed:", err);
       setMessage("Update failed. Please try again.");
     }
+  };
+
+  const handleCancel = () => {
+    setUser((prev) => ({
+      ...prev,
+      ...originalUser,
+    }));
+    setEditing(false);
+    setMessage("Changes discarded.");
   };
 
   const devices = [
@@ -160,6 +174,7 @@ const ProfilePage = () => {
                 value={user.age || ""}
                 onChange={handleChange}
                 disabled={!editing}
+                placeholder="Enter your age"
                 className="w-full mt-1 p-2 border rounded"
               />
             </div>
@@ -188,6 +203,7 @@ const ProfilePage = () => {
                 value={user.phone || ""}
                 onChange={handleChange}
                 disabled={!editing}
+                placeholder="Enter phone number"
                 className="w-full mt-1 p-2 border rounded"
               />
             </div>
@@ -200,6 +216,7 @@ const ProfilePage = () => {
                 value={user.country || ""}
                 onChange={handleChange}
                 disabled={!editing}
+                placeholder="Enter country"
                 className="w-full mt-1 p-2 border rounded"
               />
             </div>
@@ -229,15 +246,25 @@ const ProfilePage = () => {
                 Edit Profile
               </button>
             ) : (
+              <>
               <button
                 onClick={handleSave}
                 className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
               >
                 Save Profile
               </button>
+              <button
+                onClick={handleCancel}
+                className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
+              >
+                Cancel
+              </button>
+            </>
+
             )}
-            {message && <p className="text-sm text-gray-600 mt-2">{message}</p>}
+            
           </div>
+          {message && <p className="text-sm text-gray-600 mt-2">{message}</p>}
         </div>
 
         <div>

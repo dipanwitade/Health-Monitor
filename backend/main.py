@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import Base, engine, async_session
 from models import User
-from routers import auth, healthdata, google_auth
+from routers import auth, healthdata, google_auth,user
 from routers.google_auth import router as google_auth_router
 from routers.google_health import router as google_health_router
 from services.google_sync import sync_google_fit_data
@@ -22,6 +22,8 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    allow_origins=["*"],
+
 )
 
 # Include routers
@@ -31,6 +33,7 @@ app.include_router(healthdata.router)
 app.include_router(google_auth.router)
 app.include_router(google_health_router)
 app.include_router(ai.router, prefix="/ai")
+app.include_router(user.router)
 
 @app.get("/")
 def root():
@@ -60,4 +63,3 @@ async def startup_event():
                 except Exception as e:
                     print(f"❌ Failed to sync {user.email}: {e}")
 
-#hello

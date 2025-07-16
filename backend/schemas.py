@@ -78,3 +78,12 @@ class HealthDataCreate(BaseModel):
     heart_rate: float
     blood_pressure: str
     spo2: float
+
+
+class UserUpdate(BaseModel):
+    email: EmailStr  # required to identify the user
+    age: Optional[int] = None
+    gender: Optional[str] = None
+    phone: Optional[str] = None
+    country: Optional[str] = None
+    role: Optional[str] = None
