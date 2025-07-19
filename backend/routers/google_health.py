@@ -571,4 +571,40 @@ async def update_user_profile(update_data: UserUpdate, db: AsyncSession = Depend
         raise HTTPException(status_code=500, detail=f"Update failed: {str(e)}")
 
 
+@router.get("/google/devices")
+async def get_google_devices(user_email: str, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(User).where(User.email == user_email))
+    user = result.scalars().first()
+    if not user or not user.access_token:
+        raise HTTPException(status_code=404, detail="User not found or not connected")
 
+    url = "https://www.googleapis.com/fitness/v1/users/me/dataSources"
+    headers = {"Authorization": f"Bearer {user.access_token}"}
+
+    async with httpx.AsyncClient() as client:
+        res = await client.get(url, headers=headers)
+        if res.status_code != 200:
+            raise HTTPException(status_code=res.status_code, detail="Failed to fetch data sources")
+
+        data_sources = res.json().get("dataSource", [])
+
+        # Extract device info from each data source (if available)
+        # Use set to remove duplicates based on model + uid
+        seen = set()
+        devices = []
+
+        for source in data_sources:
+            device = source.get("device")
+            if device:
+                key = (device.get("manufacturer"), device.get("model"), device.get("uid"))
+                if key not in seen:
+                    seen.add(key)
+                    devices.append({
+                        "type": device.get("type"),
+                        "manufacturer": device.get("manufacturer"),
+                        "model": device.get("model"),
+                        "version": device.get("version"),
+                        "uid": device.get("uid")
+                    })
+
+        return {"devices": devices}
