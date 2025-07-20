@@ -20,19 +20,99 @@ scaler_path = os.path.join("ml_models", "scaler.pkl")
 model = joblib.load(model_path)
 scaler = joblib.load(scaler_path)
 
-@router.post("/anomaly")
+# @router.post("/anomaly")
 
-def detect_anomaly(data: HealthMetrics):
-    print("📥 Input:", data)
-    X = np.array([[data.heart_rate, data.spo2, data.systolic_bp, data.diastolic_bp]])
-    X_scaled = scaler.transform(X)
-    result = model.predict(X_scaled)[0]
-    score = model.decision_function(X_scaled)[0]
-    print("🔍 Score:", score, "Prediction:", result)
+# def detect_anomaly(data: HealthMetrics):
+#     print("📥 Input:", data)
+#     X = np.array([[data.heart_rate, data.spo2, data.systolic_bp, data.diastolic_bp]])
+#     X_scaled = scaler.transform(X)
+#     result = model.predict(X_scaled)[0]
+#     score = model.decision_function(X_scaled)[0]
+#     print("🔍 Score:", score, "Prediction:", result)
+#     return {
+#         "result": "anomaly" if result == -1 else "normal",
+#         "score": round(score, 5)
+#     }
+
+@router.get("/anomaly")
+async def anomaly_summary(
+    email: str,
+    date: str = Query(default=None, description="Format: YYYY-MM-DD"),
+    db: AsyncSession = Depends(get_db)
+):
+    # 🧑 Get user
+    result = await db.execute(select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # 🗓️ Determine the day
+    tz = pytz.timezone("Asia/Kolkata")
+    if date:
+        try:
+            selected = datetime.strptime(date, "%Y-%m-%d").replace(tzinfo=tz)
+        except:
+            raise HTTPException(status_code=400, detail="Invalid date format (YYYY-MM-DD expected)")
+    else:
+        selected = datetime.now(tz)
+
+    start = selected.replace(hour=0, minute=0, second=0, microsecond=0)
+    end = start + timedelta(days=1)
+
+    # 📊 Get all resting HR, SpO2, BP data for that date
+    result = await db.execute(
+        select(HealthData).where(
+            HealthData.user_id == user.id,
+            HealthData.metric_type.in_(["heart_rate", "spo2", "blood_pressure"]),
+            HealthData.timestamp >= start.astimezone(pytz.UTC),
+            HealthData.timestamp < end.astimezone(pytz.UTC),
+            HealthData.activity_type == "resting"
+        )
+    )
+    records = result.scalars().all()
+
+    # 🧹 Prepare vectors
+    merged = {}
+    for r in records:
+        ts = r.timestamp.replace(second=0, microsecond=0)
+        if ts not in merged:
+            merged[ts] = {}
+        if r.metric_type == "heart_rate":
+            merged[ts]["hr"] = r.value
+        elif r.metric_type == "spo2":
+            merged[ts]["spo2"] = r.value
+        elif r.metric_type == "blood_pressure":
+            merged[ts]["sbp"] = r.systolic
+            merged[ts]["dbp"] = r.diastolic
+
+    vectors = []
+    for v in merged.values():
+        if all(k in v for k in ["hr", "spo2", "sbp", "dbp"]):
+            vectors.append([v["hr"], v["spo2"], v["sbp"], v["dbp"]])
+
+    if not vectors:
+        return { "status": "no_data", "message": "No resting health data available for that day." }
+
+    if len(vectors) < 3:
+        return { "status": "insufficient", "message": "Not enough data points to detect anomaly reliably." }
+
+    # 🧠 Anomaly detection
+    X_scaled = scaler.transform(vectors)
+    predictions = model.predict(X_scaled)
+
+    total = len(vectors)
+    anomalies = sum(1 for p in predictions if p == -1)
+    percent = round((anomalies / total) * 100, 2)
+
     return {
-        "result": "anomaly" if result == -1 else "normal",
-        "score": round(score, 5)
+        "status": "alert" if percent > 20 else "ok",
+        "date": start.date().isoformat(),
+        "total_records": total,
+        "anomalies": anomalies,
+        "percent_anomalies": percent,
+        "note": "Anomalies detected based on resting heart rate, SpO2, and BP"
     }
+
 
 @router.get("/insights")
 async def get_health_insights(user_email: str, db: AsyncSession = Depends(get_db)):

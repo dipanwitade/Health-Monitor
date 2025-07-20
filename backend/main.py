@@ -9,7 +9,7 @@ from routers import auth, healthdata, google_auth,user
 from routers.google_auth import router as google_auth_router
 from routers.google_health import router as google_health_router
 from services.google_sync import sync_google_fit_data
-from routers import ai  # or whatever the path is
+from routers import ai, activity  # or whatever the path is
 
 
 
@@ -33,6 +33,7 @@ app.include_router(google_auth.router)
 app.include_router(google_health_router)
 app.include_router(ai.router, prefix="/ai")
 app.include_router(user.router)
+app.include_router(activity.router)
 
 @app.get("/")
 def root():

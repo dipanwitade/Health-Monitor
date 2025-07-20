@@ -1,11 +1,13 @@
 # backend/services/google_sync.py
 import json
-from models import HealthData, User
+from models import HealthData, User, SleepSession
 from datetime import datetime, timedelta, timezone
 import httpx
 from routers.google_auth import DATA_TYPES, GOOGLE_FIT_API_URL, build_request_body
 from sqlalchemy.future import select
-from models import SleepSession
+from utils.fit_activity_map import ACTIVITY_MAP  
+
+from models import ActivityLog
 
 async def sync_google_fit_data(user: User, db, days_back: int = 1):
     now = datetime.utcnow()
@@ -22,6 +24,45 @@ async def sync_google_fit_data(user: User, db, days_back: int = 1):
             headers = {
                 "Authorization": f"Bearer {user.access_token}"
             }
+            # STEP 1: Fetch activity segments first
+            activity_map_by_time = []
+
+            activity_body = {
+                "aggregateBy": [{ "dataTypeName": "com.google.activity.segment" }],
+                "bucketByTime": { "durationMillis": 86400000 },
+                "startTimeMillis": int(start_time.timestamp() * 1000),
+                "endTimeMillis": int(end_time.timestamp() * 1000)
+            }
+
+            activity_res = await client.post(
+                GOOGLE_FIT_API_URL,
+                headers=headers,
+                json=activity_body,
+                timeout=30.0
+            )
+
+            if activity_res.status_code == 200:
+                for bucket in activity_res.json().get("bucket", []):
+                    for dataset in bucket.get("dataset", []):
+                        for point in dataset.get("point", []):
+                            start_ms = int(point["startTimeNanos"]) // 1_000_000
+                            end_ms = int(point["endTimeNanos"]) // 1_000_000
+                            code = point["value"][0]["intVal"]
+                            activity_type = ACTIVITY_MAP.get(code, "unknown")
+                            activity_map_by_time.append({
+                                "start": datetime.fromtimestamp(start_ms / 1000, tz=timezone.utc).replace(microsecond=0),
+                                "end": datetime.fromtimestamp(end_ms / 1000, tz=timezone.utc).replace(microsecond=0),
+                                "activity": activity_type
+                            })
+
+            def infer_activity(timestamp):
+                for segment in activity_map_by_time:
+                    if segment["start"] <= timestamp <= segment["end"]:
+                        return segment["activity"]
+                return "resting"
+            
+            
+
 
             for key, data_type in DATA_TYPES.items():
                 request_body = build_request_body(data_type, start_millis, end_millis)
@@ -45,7 +86,7 @@ async def sync_google_fit_data(user: User, db, days_back: int = 1):
                             ts = int(point["startTimeNanos"]) // 1_000_000
                             ts_dt = datetime.fromtimestamp(ts / 1000, tz=timezone.utc)
                             ts_dt = ts_dt.replace(microsecond=0)
-
+                            activity = infer_activity(ts_dt)
 
                             # Deduplication check
                             exists = await db.execute(
@@ -183,7 +224,8 @@ async def sync_google_fit_data(user: User, db, days_back: int = 1):
                                             metric_type=key,
                                             systolic=int(systolic),
                                             diastolic=int(diastolic),
-                                            timestamp=ts_dt
+                                            timestamp=ts_dt,
+                                            activity_type=activity
                                         ))
 
 
@@ -237,7 +279,8 @@ async def sync_google_fit_data(user: User, db, days_back: int = 1):
                                             user_id=user.id,
                                             metric_type=key,
                                             value=round(value / 1000, 2),  # Convert to km
-                                            timestamp=ts_dt
+                                            timestamp=ts_dt,
+                                            activity_type=activity
                                         ))
 
 
@@ -248,7 +291,8 @@ async def sync_google_fit_data(user: User, db, days_back: int = 1):
                                         user_id=user.id,
                                         metric_type=key,
                                         value=value,
-                                        timestamp=ts_dt
+                                        timestamp=ts_dt,
+                                        activity_type=activity
                                     ))
 
                             elif key == "stress":
@@ -258,7 +302,8 @@ async def sync_google_fit_data(user: User, db, days_back: int = 1):
                                         user_id=user.id,
                                         metric_type=key,
                                         value=stress_val,
-                                        timestamp=ts_dt
+                                        timestamp=ts_dt,
+                                        activity_type=activity
                                     ))
 
                        
@@ -282,7 +327,8 @@ async def sync_google_fit_data(user: User, db, days_back: int = 1):
                                         user_id=user.id,
                                         metric_type=key,
                                         value=value,
-                                        timestamp=ts_dt
+                                        timestamp=ts_dt,
+                                        activity_type=activity
                                     ))
 
             # 💤 Additional fetch using sessions API for complete sleep data
@@ -325,9 +371,6 @@ async def sync_google_fit_data(user: User, db, days_back: int = 1):
                             end_time=end_dt,
                             duration_hours=duration_hours
                         ))
-
-
-
 
 
     await db.commit()

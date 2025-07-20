@@ -21,6 +21,8 @@ import SleepChart from "../components/SleepChart";
 
 import AiInsightCard from "../components/AiInsightCard";
 import InsightsPanel from "../components/InsightsPanel";
+import ActivityChart from "../components/ActivityChart";
+import AnomalyCard from "../components/AnomalyCard";
 
 const formatDuration = (totalHours) => {
   if (!totalHours || totalHours === "--") return "--";
@@ -37,7 +39,24 @@ const Dashboard = () => {
   // Add these states
   const [customStart, setCustomStart] = useState(null);
   const [customEnd, setCustomEnd] = useState(null);
-  // const [healthData, setHealthData] = useState({});
+
+  const selectedDate = (() => {
+    const now = new Date();
+    const offsetMs = 5.5 * 60 * 60 * 1000;
+    const istNow = new Date(now.getTime() + offsetMs);
+
+    if (period === "Today") {
+      return istNow.toISOString().split("T")[0];
+    } else if (period === "Yesterday") {
+      istNow.setDate(istNow.getDate() - 1);
+      return istNow.toISOString().split("T")[0];
+    } else if (period === "Custom" && customStart) {
+      return customStart;
+    }
+    return null;
+  })();
+
+ 
 
   const navigate = useNavigate();
   const email = localStorage.getItem("user_email");
@@ -47,9 +66,10 @@ const Dashboard = () => {
   const [spo2Data, setSpo2Data] = useState("--");
   const [sleepSessions, setSleepSessions] = useState([]);
   const [userName, setUserName] = useState("");
+  const [activityLogs, setActivityLogs] = useState([]);
 
 
-  // const [latest, setLatest] = useState({});
+  
   const [history, setHistory] = useState({
     heart_rate: [],
     blood_pressure: [],
@@ -398,6 +418,20 @@ const Dashboard = () => {
       } catch (err) {
         console.error("History DB fetch error:", err);
       }
+
+      // Fetch activity logs
+      try {
+        const actRes = await axios.get("http://localhost:8000/activity-logs", {
+          params: {
+            user_email: email,
+            days: 7
+          }
+        });
+        setActivityLogs(actRes.data || []);
+      } catch (err) {
+        console.error("Failed to fetch activity logs:", err);
+      }
+
     };
 
     fetchHealthData();
@@ -407,65 +441,65 @@ const Dashboard = () => {
 
 
 
+  // useEffect(() => {
+  //   const fetchAnomalyInsight = async () => {
+  //     const hr = parseFloat(averageMetrics.heart_rate);
+  //     const spo2 = parseFloat(averageMetrics.spo2);
+
+  //     let sys, dia;
+  //     if (typeof averageMetrics.blood_pressure === "string" && averageMetrics.blood_pressure.includes("/")) {
+  //       const parts = averageMetrics.blood_pressure.split("/");
+  //       sys = parseFloat(parts[0]);
+  //       dia = parseFloat(parts[1]);
+  //     }
+
+  //     // ✅ Skip if any value is missing or "--"
+  //     if (
+  //       isNaN(hr) || isNaN(spo2) || isNaN(sys) || isNaN(dia)
+  //     ) {
+  //       console.warn("⚠️ Skipping AI check: missing or invalid metrics");
+  //       setAiInsight(null); // 🚫 Reset insight
+  //       return;
+  //     }
+
+  //     try {
+  //       const response = await fetch("http://localhost:8000/ai/anomaly", {
+  //         method: "POST",
+  //         headers: { "Content-Type": "application/json" },
+  //         body: JSON.stringify({
+  //           heart_rate: hr,
+  //           spo2: spo2,
+  //           systolic_bp: sys,
+  //           diastolic_bp: dia,
+  //         }),
+  //       });
+
+  //       const data = await response.json();
+  //       setAiInsight(data);
+  //     } catch (error) {
+  //       console.error("AI Insight error:", error);
+  //       setAiInsight(null);
+  //     }
+  //   };
+
+  //   fetchAnomalyInsight();
+  // }, [averageMetrics]);
+
   useEffect(() => {
-    const fetchAnomalyInsight = async () => {
-      const hr = parseFloat(averageMetrics.heart_rate);
-      const spo2 = parseFloat(averageMetrics.spo2);
-
-      let sys, dia;
-      if (typeof averageMetrics.blood_pressure === "string" && averageMetrics.blood_pressure.includes("/")) {
-        const parts = averageMetrics.blood_pressure.split("/");
-        sys = parseFloat(parts[0]);
-        dia = parseFloat(parts[1]);
-      }
-
-      // ✅ Skip if any value is missing or "--"
-      if (
-        isNaN(hr) || isNaN(spo2) || isNaN(sys) || isNaN(dia)
-      ) {
-        console.warn("⚠️ Skipping AI check: missing or invalid metrics");
-        setAiInsight(null); // 🚫 Reset insight
-        return;
-      }
+    const fetchUserName = async () => {
+      if (!email) return;
 
       try {
-        const response = await fetch("http://localhost:8000/ai/anomaly", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            heart_rate: hr,
-            spo2: spo2,
-            systolic_bp: sys,
-            diastolic_bp: dia,
-          }),
-        });
-
-        const data = await response.json();
-        setAiInsight(data);
-      } catch (error) {
-        console.error("AI Insight error:", error);
-        setAiInsight(null);
+        const res = await axios.get(`http://localhost:8000/users/profile?email=${email}`);
+        const userData = res.data;
+        setUserName(userData.name || "User");  // fallback to "User"
+      } catch (err) {
+        console.error("Failed to fetch user name:", err);
       }
     };
 
-    fetchAnomalyInsight();
-  }, [averageMetrics]);
-
-  useEffect(() => {
-  const fetchUserName = async () => {
-    if (!email) return;
-
-    try {
-      const res = await axios.get(`http://localhost:8000/users/profile?email=${email}`);
-      const userData = res.data;
-      setUserName(userData.name || "User");  // fallback to "User"
-    } catch (err) {
-      console.error("Failed to fetch user name:", err);
-    }
-  };
-
-  fetchUserName();
-}, []);
+    fetchUserName();
+  }, []);
 
 
   useEffect(() => {
@@ -526,7 +560,7 @@ const Dashboard = () => {
         aiInsight && <AiInsightCard result={aiInsight.result} score={aiInsight.score} />
       )} */}
 
-      {aiInsight?.result === "normal" && (
+      {/* {aiInsight?.result === "normal" && (
         <AiInsightCard result="normal" score={aiInsight.score} />
       )}
       {aiInsight?.result === "anomaly" && (
@@ -534,7 +568,9 @@ const Dashboard = () => {
       )}
       {aiInsight?.result === "no_data" && (
         <AiInsightCard result="no_data" />
-      )}
+      )} */}
+
+      <AnomalyCard email={email} selectedDate={selectedDate} />
 
       <InsightsPanel insights={insights} />
 
@@ -590,6 +626,8 @@ const Dashboard = () => {
       </div>
 
       <SleepChart sleepSessions={sleepSessions} />
+      <ActivityChart data={activityLogs} />
+
 
       <div className="min-h-[40px] text-center">
         <p className="text-sm text-gray-500 mt-2">Last updated at: {new Date().toLocaleTimeString()}</p>
