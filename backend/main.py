@@ -62,5 +62,3 @@ async def startup_event():
                     print(f"✅ Synced data for {user.email}")
                 except Exception as e:
                     print(f"❌ Failed to sync {user.email}: {e}")
-
-#hello
