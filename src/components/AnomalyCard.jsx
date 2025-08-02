@@ -9,9 +9,17 @@ const AnomalyCard = ({ email, selectedDate }) => {
   useEffect(() => {
     const fetchAnomaly = async () => {
       try {
-        const dateParam = selectedDate
-          ? `&date=${selectedDate.toISOString().split("T")[0]}`
-          : "";
+        let formattedDate = null;
+        // 🔒 Handle both string and Date object for safety
+        if (selectedDate) {
+          if (typeof selectedDate === "string") {
+            formattedDate = selectedDate;
+          } else if (selectedDate instanceof Date && !isNaN(selectedDate)) {
+            formattedDate = selectedDate.toISOString().split("T")[0];
+          }
+        }
+        // const dateParam = selectedDate? `&date=${selectedDate.toISOString().split("T")[0]}`: "";
+        const dateParam = formattedDate ? `&date=${formattedDate}` : "";
         const res = await axios.get(
           `http://localhost:8000/ai/anomaly?email=${email}${dateParam}`
         );
@@ -23,7 +31,7 @@ const AnomalyCard = ({ email, selectedDate }) => {
       }
     };
 
-    fetchAnomaly();
+    if (email) fetchAnomaly();
   }, [email, selectedDate]);
 
   const renderContent = () => {

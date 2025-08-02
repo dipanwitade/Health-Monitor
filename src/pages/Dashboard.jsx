@@ -24,13 +24,19 @@ import InsightsPanel from "../components/InsightsPanel";
 import ActivityChart from "../components/ActivityChart";
 import AnomalyCard from "../components/AnomalyCard";
 
-const formatDuration = (totalHours) => {
-  if (!totalHours || totalHours === "--") return "--";
-  const hours = Math.floor(totalHours);
-  const minutes = Math.round((totalHours - hours) * 60);
-  return `${hours}h ${minutes}m`;
-};
+// const formatDuration = (totalHours) => {
+//   if (!totalHours || totalHours === "--") return "--";
+//   const hours = Math.floor(totalHours);
+//   const minutes = Math.round((totalHours - hours) * 60);
+//   return `${hours}h ${minutes}m`;
+// };
 
+
+// ✅ Format sleep duration for display (1 decimal place)
+const formatDuration = (hours) => {
+  if (!hours || hours === "--") return "--";
+  return `${parseFloat(hours).toFixed(1)} hrs`;
+};
 
 
 
@@ -56,7 +62,7 @@ const Dashboard = () => {
     return null;
   })();
 
- 
+
 
   const navigate = useNavigate();
   const email = localStorage.getItem("user_email");
@@ -69,7 +75,7 @@ const Dashboard = () => {
   const [activityLogs, setActivityLogs] = useState([]);
 
 
-  
+
   const [history, setHistory] = useState({
     heart_rate: [],
     blood_pressure: [],
@@ -95,11 +101,24 @@ const Dashboard = () => {
   const [aiInsight, setAiInsight] = useState(null);
   const [insights, setInsights] = useState([]);
 
-  const getSum = (data) => {
+  // const getSum = (data) => {
+  //   if (!data || data.length === 0) return "--";
+  //   const sum = data.reduce((acc, val) => acc + (val.value || val.duration_hours || 0), 0);
+  //   return Math.round(sum);
+  // };
+
+  // ✅ Integer sum – use for steps, calories
+  const getSumInt = (data) => {
     if (!data || data.length === 0) return "--";
-    const sum = data.reduce((acc, val) => acc + (val.value || val.duration_hours || 0), 0);
+    const sum = data.reduce((acc, val) => acc + (val.value || 0), 0);
     return Math.round(sum);
   };
+  // ✅ Float sum – use for distance, sleep (raw)
+  const getSumFloat = (data) => {
+    if (!data || data.length === 0) return 0;
+    return data.reduce((acc, val) => acc + (val.value || val.duration_hours || 0), 0);
+  };
+
 
 
 
@@ -234,15 +253,11 @@ const Dashboard = () => {
     const fetchHealthData = async () => {
       if (!email) return;
 
-
-      // Determine period
-      const today = new Date();
-      let startDate;
+      // Reset state
       setHistory({
         heart_rate: [],
         spo2: [],
         blood_pressure: [],
-        spo2: [],
         steps: [],
         distance: [],
         calories: [],
@@ -261,6 +276,9 @@ const Dashboard = () => {
         stress: "--",
       });
 
+      // Determine period
+      const today = new Date();
+      let startDate;
       try {
         const sleepSessionRes = await axios.get("http://localhost:8000/sleep-sessions", {
           params: {
@@ -321,20 +339,37 @@ const Dashboard = () => {
             spo2: data.spo2?.length ? getAverage(data.spo2) : "--",
             blood_pressure: data.blood_pressure?.length ? getAverageBP(data.blood_pressure) : "--",
             stress: data.stress?.length ? getAverage(data.stress) : "--",
-            steps: data.steps?.length ? getSum(data.steps) : "--",
-            calories: data.calories?.length ? getSum(data.calories) : "--",
-            distance: data.distance?.length ? getSum(data.distance) : "--",
+            steps: data.steps?.length ? getSumInt(data.steps) : "--",
+            calories: data.calories?.length ? getSumInt(data.calories) : "--",
+            // distance: data.distance?.length ? getSum(data.distance) : "--",
+            distance: data.distance?.length ? getSumFloat(data.distance).toFixed(2) : "--",
+
             // sleep: data.sleep?.length ? getSum(data.sleep) : "--",
             // sleep: data.sleep?.length ? getSum(sleepSessionRes.data.sleep_sessions) : "--",
             sleep: (() => {
               const today = new Date();
               today.setHours(0, 0, 0, 0);
               const filteredSleepSessions = sleepSessionRes.data.sleep_sessions.filter(session => {
-                const sessionDate = new Date(session.start_time);
-                sessionDate.setHours(0, 0, 0, 0);
-                return sessionDate.getTime() === today.getTime();
+                // const sessionDate = new Date(session.start_time);
+                // sessionDate.setHours(0, 0, 0, 0);
+                // return sessionDate.getTime() === today.getTime();
+
+
+                // const sessionDateStr = new Date(session.start_time).toISOString().split("T")[0];
+                // console.log("🛌 Matching", sessionDateStr, "==", startDate);
+                // return sessionDateStr === startDate;
+
+                const sessionStart = new Date(session.start_time);
+                const sessionEnd = new Date(session.end_time);
+                const start = new Date(startDate);
+                start.setHours(0, 0, 0, 0);
+                const end = new Date(start.getTime() + 86400000); // next day
+
+                return sessionStart <= end && sessionEnd >= start;
+
+
               });
-              return filteredSleepSessions.length ? formatDuration(getSum(filteredSleepSessions)) : "--";
+              return filteredSleepSessions.length ? formatDuration(getSumFloat(filteredSleepSessions)) : "--";
             })(),
 
 
@@ -395,20 +430,36 @@ const Dashboard = () => {
             heart_rate: data.heart_rate?.length ? getAverage(data.heart_rate) : "--",
             spo2: data.spo2?.length ? getAverage(data.spo2) : "--",
             blood_pressure: data.blood_pressure?.length ? getAverageBP(data.blood_pressure) : "--",
-            steps: getSum(data.steps),
-            distance: getSum(data.distance),
-            calories: getSum(data.calories),
+            steps: getSumInt(data.steps),
+            distance: getSumFloat(data.distance),
+            calories: getSumInt(data.calories),
             stress: getAverage(data.stress),
             // sleep: getSum(sleepSessionRes.data.sleep_sessions),
             sleep: (() => {
               const target = new Date(startDate);
               target.setHours(0, 0, 0, 0);
               const filteredSleepSessions = sleepSessionRes.data.sleep_sessions.filter(session => {
-                const sessionDate = new Date(session.start_time);
-                sessionDate.setHours(0, 0, 0, 0);
-                return sessionDate.getTime() === target.getTime();
+                // const sessionDate = new Date(session.start_time);
+                // sessionDate.setHours(0, 0, 0, 0);
+                // return sessionDate.getTime() === target.getTime();
+
+
+                // const sessionDateStr = new Date(session.start_time).toISOString().split("T")[0];
+                // console.log("🛌 Matching", sessionDateStr, "==", startDate);
+
+                // return sessionDateStr === startDate;
+
+                const sessionStart = new Date(session.start_time);
+                const sessionEnd = new Date(session.end_time);
+                const start = new Date(startDate);
+                start.setHours(0, 0, 0, 0);
+                const end = new Date(start.getTime() + 86400000);
+
+                return sessionStart <= end && sessionEnd >= start;
+
+
               });
-              return filteredSleepSessions.length ? formatDuration(getSum(filteredSleepSessions)) : "--";
+              return filteredSleepSessions.length ? formatDuration(getSumFloat(filteredSleepSessions)) : "--";
             })(),
 
           });
