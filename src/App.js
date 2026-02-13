@@ -9,7 +9,8 @@ import OAuthSuccess from './pages/OAuthSuccess';
 
 import MainLayout from "./layouts/MainLayout";
 import ProtectedRoute from "./routes/ProtectedRoute";
-import Signup from "./pages/Signup";
+import PersonalizedDashboard from "./pages/PersonalizedDashboard";
+
 import Landing from "./pages/Landing";
 
 
@@ -19,7 +20,7 @@ const App = () => {
       <Routes>
 
         {/* Public Routes */}
-        <Route path="/signup" element={<Signup />} />
+        
         <Route path="/login" element={<Login />} />
         <Route path="/oauth-success" element={<OAuthSuccess />} />
         <Route path="/logout" element={<Logout />} />
@@ -42,6 +43,13 @@ const App = () => {
         <Route path="/profile" element={
           <ProtectedRoute>
             <MainLayout><ProfilePage /></MainLayout>
+          </ProtectedRoute>
+        } />
+
+        {/* ✅ New Personalized Dashboard */}
+        <Route path="/personal-dashboard" element={
+          <ProtectedRoute>
+            <MainLayout><PersonalizedDashboard /></MainLayout>
           </ProtectedRoute>
         } />
 

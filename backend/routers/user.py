@@ -4,8 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from models import User
 from database import get_db
-# from schemas import UserResponse  # or your schema module
-# , response_model=UserResponse
+
 router = APIRouter()
 
 @router.get("/users/profile")

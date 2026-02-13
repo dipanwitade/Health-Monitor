@@ -1,0 +1,34 @@
+# Core FastAPI backend
+fastapi==0.115.12
+uvicorn[standard]==0.22.0
+
+# Database
+sqlalchemy==2.0.41
+aiosqlite==0.21.0
+
+# Authentication & security
+python-jose==3.5.0
+bcrypt==4.3.0
+argon2-cffi==25.1.0
+python-multipart==0.0.20
+
+# Pydantic for data validation
+pydantic[email]==2.11.5
+pydantic-extra-types==2.10.5
+
+# HTTP client for async requests (Google Fit)
+httpx==0.28.1
+requests==2.32.3
+
+# Timezone handling
+pytz==2025.2
+
+# ML / AI
+scikit-learn==1.7.0
+joblib==1.5.1
+numpy==2.3.1
+scipy==1.16.0
+
+# Optional utility (needed by some packages)
+typing_extensions==4.14.0
+pandas==2.3.1

@@ -1,0 +1,11 @@
+{
+    "last_trained": "2026-02-02T18:47:10.505266+00:00",
+    "n_windows": 576,
+    "metrics": [
+        "heart_rate",
+        "spo2",
+        "systolic_bp",
+        "diastolic_bp"
+    ],
+    "model_version": "v2_windowed"
+}

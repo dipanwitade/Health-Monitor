@@ -1,316 +1,237 @@
-// import React from "react";
-// import MainLayout from "../layouts/MainLayout";
-// import ConnectedDeviceCard from "../components/ConnectedDeviceCard";
-
-// const ProfilePage = () => {
-//   const user = {
-//     name: "Tanmay Gusain",
-//     email: "tanmay@example.com",
-//     avatar: "https://i.pravatar.cc/150?img=56",
-//   };
-
-//   const devices = [
-//     {
-//       name: "Fitbit Versa 4",
-//       type: "Smartwatch",
-//       logo: "https://logodownload.org/wp-content/uploads/2020/07/fitbit-logo.png",
-//       connected: true,
-//     },
-//     {
-//       name: "Samsung Galaxy Watch",
-//       type: "Smartwatch",
-//       logo: "https://cdn-icons-png.flaticon.com/512/5968/5968381.png",
-//       connected: false,
-//     },
-//   ];
-
-//   return (
-//     <div>
-//       <h1 className="text-2xl font-bold text-gray-800 mb-4">My Profile</h1>
-
-//       <div className="bg-white rounded-2xl p-6 shadow-md flex items-center space-x-6 mb-6">
-//         <img
-//           src={user.avatar}
-//           alt="avatar"
-//           className="w-20 h-20 rounded-full object-cover border-2 border-gray-300"
-//         />
-//         <div>
-//           <h2 className="text-xl font-semibold text-gray-700">{user.name}</h2>
-//           <p className="text-sm text-gray-500">{user.email}</p>
-//         </div>
-//       </div>
-
-//       <div>
-//         <h3 className="text-lg font-semibold text-gray-700 mb-2">Connected Devices</h3>
-//         <div className="space-y-3">
-//           {devices.map((device, index) => (
-//             <ConnectedDeviceCard key={index} device={device} />
-//           ))}
-//         </div>
-//       </div>
-//     </div>
-//   );
-// };
-
-// export default ProfilePage;
-
-
 import React, { useEffect, useState } from "react";
-
-import ConnectedDeviceCard from "../components/ConnectedDeviceCard";
 import axios from "axios";
+console.log("ENV API URL =", process.env.REACT_APP_API_URL);
 
 const ProfilePage = () => {
+  const apiUrl = process.env.REACT_APP_API_URL;
+
   const [user, setUser] = useState({
     name: "",
     email: "",
-    avatar: "https://i.pravatar.cc/150?img=56",
+    avatar: "",
     age: "",
     gender: "",
     phone: "",
     country: "",
-    role: "Patient", // default
+    role: "",
   });
 
   const [editing, setEditing] = useState(false);
   const [message, setMessage] = useState("");
   const [originalUser, setOriginalUser] = useState({});
+  const [devices, setDevices] = useState([]);
 
   useEffect(() => {
-    const fetchUser = async () => {
+    const fetchProfile = async () => {
       try {
-        const email = localStorage.getItem("user_email"); // must be set on login
-        const res = await axios.get(`http://localhost:8000/users/profile?email=${email}`);
-        const userData = res.data;
-        setUser((prev) => ({
-          ...prev,
-          ...userData,
-          role: userData.role || "Patient",
-        }));
-        console.log("Fetched user:", userData);
+        const email = localStorage.getItem("user_email");
+        const name = localStorage.getItem("user_name");
+        const avatar = localStorage.getItem("user_avatar");
 
-        setOriginalUser(userData);
+        if (!email) return;
+
+        const res = await axios.get(`${apiUrl}/users/profile?email=${email}`);
+
+        const mergedUser = {
+          ...res.data,
+          email: res.data.email || email,
+          name: res.data.name || name || "User",
+          avatar: res.data.avatar || avatar,
+        };
+
+        setUser(mergedUser);
+        setOriginalUser(mergedUser);
+
+        const deviceRes = await axios.get(
+          `${apiUrl}/google/devices?user_email=${email}`
+        );
+        setDevices(deviceRes.data.devices || []);
       } catch (err) {
-        console.error("Failed to load profile:", err);
+        console.error("Profile load failed:", err);
       }
     };
 
-    fetchUser();
-  }, []);
+    fetchProfile();
+  }, [apiUrl]);
 
   const handleChange = (e) => {
-    setUser({ ...user, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+
+    // Age: numeric only, max 150
+    if (name === "age") {
+      if (!/^\d*$/.test(value)) return; // numbers only
+      if (Number(value) > 150) return; // max 150
+    }
+
+    // Phone: digits only, max 10
+    if (name === "phone") {
+      if (!/^\d*$/.test(value)) return;
+      if (value.length > 10) return;
+    }
+
+    // Country: letters & spaces only
+    if (name === "country") {
+      if (!/^[a-zA-Z\s]*$/.test(value)) return;
+    }
+
+    // Update state without disappearing values
+    setUser({ ...user, [name]: value === "" ? "" : value });
   };
 
   const handleSave = async () => {
     try {
-      await axios.put("http://localhost:8000/users/update", {
+      const payload = {
         email: user.email,
-        age: user.age,
-        gender: user.gender,
-        phone: user.phone,
-        country: user.country,
-        role: user.role,
-      });
-      setMessage("Profile updated successfully!");
-      setOriginalUser(user); // Update backup
+        age: user.age || null,
+        gender: user.gender || null,
+        phone: user.phone || null,
+        country: user.country || null,
+        role: user.role || null,
+      };
+
+      await axios.put(`${apiUrl}/users/update`, payload);
+
+      setOriginalUser(user);
       setEditing(false);
+      setMessage("Profile updated successfully!");
     } catch (err) {
-      console.error("Profile update failed:", err);
-      setMessage("Update failed. Please try again.");
+      console.error(err);
+      setMessage("Update failed.");
     }
   };
 
   const handleCancel = () => {
-    setUser((prev) => ({
-      ...prev,
-      ...originalUser,
-    }));
+    setUser(originalUser);
     setEditing(false);
     setMessage("Changes discarded.");
   };
 
-  const [devices, setDevices] = useState([]);
-
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const email = localStorage.getItem("user_email");
-        const res = await axios.get(`http://localhost:8000/users/profile?email=${email}`);
-        const userData = res.data;
-        setUser((prev) => ({
-          ...prev,
-          ...userData,
-          role: userData.role || "Patient",
-        }));
-        setOriginalUser(userData);
-
-        // ✅ Fetch device info after user profile is loaded
-        const deviceRes = await axios.get(`http://localhost:8000/google/devices?user_email=${userData.email}`);
-        setDevices(deviceRes.data.devices || []);
-      } catch (err) {
-        console.error("Failed to load profile:", err);
-      }
-    };
-
-    fetchUser();
-  }, []);
-
+  const display = (value) =>
+    value || <span className="text-gray-400">Not set</span>;
 
   return (
-
     <div className="p-6">
-      <h1 className="text-2xl font-bold text-gray-800 mb-4">My Profile</h1>
+      <h1 className="text-2xl font-bold mb-4">My Profile</h1>
 
-      <div className="bg-white rounded-2xl p-6 shadow-md flex items-center space-x-6 mb-6">
-        <img
-          src={user.avatar}
-          alt="avatar"
-          className="w-20 h-20 rounded-full object-cover border-2 border-gray-300"
-        />
+      {/* BASIC INFO */}
+      <div className="bg-white p-6 rounded-xl shadow mb-6 flex items-center gap-6">
+        {/* Circle with letter H */}
+        <div className="w-20 h-20 rounded-full bg-gray-400 flex items-center justify-center text-white text-2xl font-bold border">
+          H
+        </div>
+
         <div>
-          <h2 className="text-xl font-semibold text-gray-700">{user.name || "N/A"}</h2>
-          <p className="text-sm text-gray-500">{user.email || "N/A"}</p>
+          <h2 className="text-xl font-semibold">{user.name || "User"}</h2>
+          <p className="text-gray-500">{user.email || "No email"}</p>
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl p-6 shadow-md mb-6">
-        <h3 className="text-lg font-semibold mb-4 text-gray-700">Personal Details</h3>
+      {/* PERSONAL DETAILS */}
+      <div className="bg-white p-6 rounded-xl shadow mb-6">
+        <h3 className="text-lg font-semibold mb-4">Personal Details</h3>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium">Age</label>
+        {!editing ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            <p>
+              <strong>Age:</strong> {display(user.age)}
+            </p>
+            <p>
+              <strong>Gender:</strong> {display(user.gender)}
+            </p>
+            <p>
+              <strong>Phone:</strong> {display(user.phone)}
+            </p>
+            <p>
+              <strong>Country:</strong> {display(user.country)}
+            </p>
+            <p>
+              <strong>Role:</strong> {display(user.role)}
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <input
-              type="number"
               name="age"
+              placeholder="Age"
+              type="number"
               value={user.age || ""}
               onChange={handleChange}
-              disabled={!editing}
-              placeholder="Enter your age"
-              className="w-full mt-1 p-2 border rounded"
             />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium">Gender</label>
             <select
               name="gender"
               value={user.gender || ""}
               onChange={handleChange}
-              disabled={!editing}
-              className="w-full mt-1 p-2 border rounded"
             >
-              <option value="">Select</option>
-              <option value="Male">Male</option>
-              <option value="Female">Female</option>
-              <option value="Other">Other</option>
+              <option value="">Gender</option>
+              <option>Male</option>
+              <option>Female</option>
+              <option>Other</option>
             </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium">Phone</label>
             <input
-              type="tel"
               name="phone"
+              placeholder="Phone (10 digits)"
               value={user.phone || ""}
               onChange={handleChange}
-              disabled={!editing}
-              placeholder="Enter phone number"
-              className="w-full mt-1 p-2 border rounded"
             />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium">Country</label>
             <input
-              type="text"
               name="country"
+              placeholder="Country"
               value={user.country || ""}
               onChange={handleChange}
-              disabled={!editing}
-              placeholder="Enter country"
-              className="w-full mt-1 p-2 border rounded"
             />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium">Role</label>
             <select
               name="role"
-              value={user.role || "Patient"}
+              value={user.role || ""}
               onChange={handleChange}
-              disabled={!editing}
-              className="w-full mt-1 p-2 border rounded"
             >
-              <option value="Patient">Patient</option>
-              <option value="Doctor">Doctor</option>
-              <option value="Admin">Admin</option>
+              <option value="">Role</option>
+              <option>Patient</option>
+              <option>Doctor</option>
+              <option>Admin</option>
             </select>
           </div>
-        </div>
+        )}
 
-        <div className="mt-4 flex gap-4">
+        <div className="mt-4 flex gap-3">
           {!editing ? (
-            <button
-              onClick={() => setEditing(true)}
-              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-            >
+            <button onClick={() => setEditing(true)} className="btn-primary">
               Edit Profile
             </button>
           ) : (
             <>
-              <button
-                onClick={handleSave}
-                className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-              >
-                Save Profile
+              <button onClick={handleSave} className="btn-success">
+                Save
               </button>
-              <button
-                onClick={handleCancel}
-                className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
-              >
+              <button onClick={handleCancel} className="btn-secondary">
                 Cancel
               </button>
             </>
-
           )}
-
         </div>
-        {message && <p className="text-sm text-gray-600 mt-2">{message}</p>}
+
+        {message && <p className="text-sm mt-2">{message}</p>}
       </div>
+
+      {/* DEVICES */}
       <div>
-        <h3 className="text-lg font-semibold text-gray-700 mb-2">Connected Devices</h3>
+        <h3 className="text-lg font-semibold mb-2">Connected Devices</h3>
         {devices.length === 0 ? (
           <p className="text-gray-500">No devices found.</p>
         ) : (
-          <div className="space-y-3">
-            {devices.map((device, index) => (
-              <div
-                key={index}
-                className="bg-gray-100 p-4 rounded-lg shadow-sm flex items-center justify-between"
-              >
-                <div>
-                  <p className="font-medium text-gray-800">
-                    {device.manufacturer || "Unknown"} {device.model || ""}
-                  </p>
-                  <p className="text-sm text-gray-500 capitalize">
-                    Type: {device.type || "N/A"} • Version: {device.version || "N/A"}
-                  </p>
-                </div>
-                {device.uid && (
-                  <span className="text-xs text-gray-400">UID: {device.uid}</span>
-                )}
-              </div>
-            ))}
-          </div>
+          devices.map((d, i) => (
+            <div key={i} className="bg-gray-100 p-4 rounded mb-2">
+              <p className="font-medium">
+                {d.manufacturer} {d.model}
+              </p>
+              <p className="text-sm text-gray-500">
+                {d.type} • {d.version}
+              </p>
+            </div>
+          ))
         )}
       </div>
-
-
     </div>
-
   );
 };
 
 export default ProfilePage;
-

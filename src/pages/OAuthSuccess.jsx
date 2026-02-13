@@ -15,7 +15,7 @@ export default function OAuthSuccess() {
     } else {
       navigate("/login" , { replace: true });
     }
-  }, [location.search]); // ✅ Triggers effect when URL changes
+  }, [location.search, navigate]); 
 
   return (
     <div className="text-center mt-10">Logging you in...</div>

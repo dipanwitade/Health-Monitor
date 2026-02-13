@@ -9,7 +9,7 @@ const Logout = () => {
     navigate('/login');
   }, [navigate]);
 
-  return null; // Blank screen briefly
+  return null; 
 };
 
 export default Logout;
