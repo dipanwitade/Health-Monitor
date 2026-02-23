@@ -8,6 +8,9 @@ import axios from "../api/axios";
 
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Label } from "recharts";
 
+import DemoTourModal from "../components/DemoTourModal";
+import { isDemoMode, exitDemoMode } from "../demo/demoMode";
+import { demoAnomalySummary } from "../demo/demoData";
 
 const DonutCenterLabel = ({ viewBox, value, status }) => {
   const cx = viewBox?.cx;
@@ -42,13 +45,23 @@ const DonutCenterLabel = ({ viewBox, value, status }) => {
 };
 
 const PersonalizedDashboard = () => {
+  const demo = isDemoMode();
+  const [tourOpen, setTourOpen] = useState(false);
   const [anomalyData, setAnomalyData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const navigate = useNavigate();
 
+
   useEffect(() => {
+    setLoading(true);
     const email = localStorage.getItem("user_email");
+    if (demo) {
+      setAnomalyData(demoAnomalySummary);
+      setMessage("");
+      setLoading(false);
+      return;
+    }
 
     if (!email) {
       navigate("/login");
@@ -79,9 +92,10 @@ const PersonalizedDashboard = () => {
     };
 
     fetchData();
-  }, [navigate]);
+    // }, [navigate]);
+  }, [demo, navigate]);
 
-  
+
   const statusMeta = useMemo(() => {
     const status = anomalyData?.status;
     if (status === "alert") {
@@ -217,7 +231,7 @@ const PersonalizedDashboard = () => {
   // ---- Main UI ----
   return (
     <div className="min-h-screen bg-gray-50">
-      
+
       <div className="sticky top-0 z-40 bg-white/85 backdrop-blur-md border-b">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3">
           <div className="flex items-center justify-between gap-3">
@@ -249,6 +263,50 @@ const PersonalizedDashboard = () => {
           </div>
         </div>
       </div>
+
+      {demo && (
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-4">
+          <div className="rounded-2xl border bg-yellow-50 p-3 flex items-center justify-between gap-3">
+            <div className="text-sm text-yellow-900">
+              <span className="font-extrabold">DEMO MODE</span> — showing sample insights.
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setTourOpen(true)}
+                className="px-3 py-2 rounded-xl border bg-white hover:bg-yellow-100 text-sm font-semibold"
+              >
+                Start Tour
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  exitDemoMode();
+                  navigate("/", { replace: true });
+                }}
+                className="px-3 py-2 rounded-xl bg-gray-900 hover:bg-black text-white text-sm font-semibold"
+              >
+                Exit Demo
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  exitDemoMode();
+                  navigate("/login", { replace: true });
+                }}
+                className="px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold"
+              >
+                Connect Google Fit
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <DemoTourModal open={tourOpen} onClose={() => setTourOpen(false)} />
 
       {/* Content */}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-5 pb-10 space-y-5">

@@ -32,3 +32,4 @@ scipy==1.16.0
 # Optional utility (needed by some packages)
 typing_extensions==4.14.0
 pandas==2.3.1
+asyncpg

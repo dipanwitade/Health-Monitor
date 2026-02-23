@@ -20,19 +20,26 @@ const App = () => {
       <Routes>
 
         {/* Public Routes */}
-        
+
         <Route path="/login" element={<Login />} />
         <Route path="/oauth-success" element={<OAuthSuccess />} />
         <Route path="/logout" element={<Logout />} />
 
         {/* Protected Routes */}
-        <Route path="/" element={<Landing />} />
 
-        {/* <Route path="/" element={
-          <ProtectedRoute>
-            <MainLayout><Dashboard /></MainLayout>
-          </ProtectedRoute>
-        } /> */}
+
+
+        <Route
+          path="/"
+          element={
+            localStorage.getItem("user_email") &&
+              localStorage.getItem("demo_mode") !== "true"
+              ? <Navigate to="/dashboard" replace />
+              : <Landing />
+          }
+        />
+
+
 
         <Route path="/dashboard" element={
           <ProtectedRoute>
@@ -46,7 +53,7 @@ const App = () => {
           </ProtectedRoute>
         } />
 
-        {/* ✅ New Personalized Dashboard */}
+        {/*  New Personalized Dashboard */}
         <Route path="/personal-dashboard" element={
           <ProtectedRoute>
             <MainLayout><PersonalizedDashboard /></MainLayout>

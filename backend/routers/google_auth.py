@@ -70,10 +70,11 @@ async def login():
         "redirect_uri": REDIRECT_URI,
         "scope": " ".join(SCOPES),
         "access_type": "offline",
-        "prompt": "consent"
+        # "prompt": "consent"
+        "include_granted_scopes": "true",
+        "prompt": "select_account",
     })
-    print("REDIRECT_URI =", os.getenv("REDIRECT_URI"))
-    print("FRONTEND_URL =", os.getenv("FRONTEND_URL"))
+    
 
     return RedirectResponse(f"{GOOGLE_AUTH_URL}?{query}")
 

@@ -8,7 +8,20 @@ import PeriodSelector from "../components/PeriodSelector";
 import LineChartPanel from "../components/LineChartPanel";
 import GroupedHealthCards from "../components/GroupedHealthCards";
 import SleepChart from "../components/SleepChart";
+import DemoTourModal from "../components/DemoTourModal";
+import { isDemoMode, exitDemoMode } from "../demo/demoMode";
+import { demoHistory, demoSleepSessions } from "../demo/demoData";
 
+
+const getPeriodLabel = (period, customStart) => {
+  if (period === "Today") return "Today";
+  if (period === "Yesterday") return "Yesterday";
+  if (period === "Custom" && customStart) {
+    const d = new Date(customStart + "T00:00:00");
+    return `On ${d.toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}`;
+  }
+  return "Selected day";
+};
 
 const formatDuration = (hours) => {
   if (!hours || hours === "--") return "--";
@@ -83,6 +96,9 @@ const getAvgBP = (bpArr) => {
 };
 
 const Dashboard = () => {
+
+  const demo = isDemoMode();
+  const [tourOpen, setTourOpen] = useState(false);
   const [period, setPeriod] = useState("Today");
   const [customStart, setCustomStart] = useState(null);
 
@@ -97,6 +113,9 @@ const Dashboard = () => {
   const [lastSyncedAt, setLastSyncedAt] = useState(
     localStorage.getItem("last_synced_at")
   );
+
+
+
 
   const [history, setHistory] = useState({
     heart_rate: [],
@@ -125,6 +144,7 @@ const Dashboard = () => {
 
   // ---------- sync ----------
   const handleSync = async () => {
+    if (demo) return;
     if (syncState !== "idle") return;
 
     try {
@@ -152,9 +172,10 @@ const Dashboard = () => {
   };
 
   // ---------- auth redirect ----------
+
   useEffect(() => {
-    if (!email) navigate("/login");
-  }, [email, navigate]);
+    if (!demo && !email) navigate("/login");
+  }, [demo, email, navigate]);
 
 
   useEffect(() => {
@@ -169,7 +190,37 @@ const Dashboard = () => {
 
   // ---------- fetch data ----------
   useEffect(() => {
+    const periodLabel = getPeriodLabel(period, customStart);
     const fetchHealthData = async () => {
+      
+      if (demo) {
+        setSleepSessions(demoSleepSessions);
+
+        setHistory({
+          heart_rate: demoHistory.heart_rate,
+          spo2: demoHistory.spo2,
+          blood_pressure: demoHistory.blood_pressure,
+          steps: demoHistory.steps,
+          distance: demoHistory.distance,
+          calories: demoHistory.calories,
+          sleep: demoHistory.sleep,
+          stress: demoHistory.stress,
+        });
+
+        setAverageMetrics({
+          heart_rate: { primary: 76, unit: "bpm", subtitle: "Low 70 • High 88" },
+          spo2: { primary: 96, unit: "%", subtitle: "Avg 97%" },
+          blood_pressure: { primary: "122/80", unit: "mmHg", subtitle: `${periodLabel} avg 124/82` },
+          steps: { primary: 6400, unit: "", subtitle: `${periodLabel} total` },
+          distance: { primary: "4.30", unit: "km", subtitle: `${periodLabel} total` },
+          calories: { primary: 520, unit: "kcal", subtitle: `${periodLabel} total` },
+          sleep: { primary: "7.0 hrs", unit: "", subtitle: "Last night" },
+          stress: { primary: 3, unit: "level", subtitle: "Peak 4" },
+        });
+
+        setUserName("Demo User");
+        return;
+      }
       if (!email) return;
 
       setHistory({
@@ -260,7 +311,7 @@ const Dashboard = () => {
             ? {
               primary: getLatestBP(data.blood_pressure),
               unit: "mmHg",
-              subtitle: `Today avg ${getAvgBP(data.blood_pressure)}`,
+              subtitle: `${periodLabel} avg ${getAvgBP(data.blood_pressure)}`,
             }
             : { primary: "--", unit: "mmHg", subtitle: "" },
 
@@ -273,14 +324,14 @@ const Dashboard = () => {
             : { primary: "--", unit: "level", subtitle: "" },
 
           steps: data.steps?.length
-            ? { primary: getSumInt(data.steps), unit: "", subtitle: "Today total" }
+            ? { primary: getSumInt(data.steps), unit: "", subtitle: `${periodLabel} total` }
             : { primary: "--", unit: "", subtitle: "" },
 
           calories: data.calories?.length
             ? {
               primary: getSumInt(data.calories),
               unit: "kcal",
-              subtitle: "Today total",
+              subtitle: `${periodLabel} total`,
             }
             : { primary: "--", unit: "kcal", subtitle: "" },
 
@@ -288,7 +339,7 @@ const Dashboard = () => {
             ? {
               primary: `${getSumFloat(data.distance).toFixed(2)}`,
               unit: "km",
-              subtitle: "Today total",
+              subtitle: `${periodLabel} total`,
             }
             : { primary: "--", unit: "km", subtitle: "" },
 
@@ -308,7 +359,7 @@ const Dashboard = () => {
               ? {
                 primary: formatDuration(getSumFloat(filteredSleepSessions)),
                 unit: "",
-                subtitle: "Last night",
+                subtitle: period === "Today" ? "Last night" : periodLabel,
               }
               : { primary: "--", unit: "", subtitle: "" };
           })(),
@@ -317,19 +368,12 @@ const Dashboard = () => {
         console.error("History DB fetch error:", err);
       }
 
-      // try {
-      //   // const actRes = await axios.get("http://localhost:8000/activity-logs", {
-      //   const actRes = await axios.get("https://health-monitor-djcv.onrender.com/activity-logs", {
-      //     params: { user_email: email, days: 7 },
-      //   });
-      //   setActivityLogs(actRes.data || []);
-      // } catch (err) {
-      //   console.error("Failed to fetch activity logs:", err);
-      // }
+
     };
 
     fetchHealthData();
-  }, [email,period, customStart]);
+
+  }, [demo, email, period, customStart]);
 
   // ---------- user name ----------
   useEffect(() => {
@@ -405,7 +449,8 @@ const Dashboard = () => {
 
               <button
                 onClick={handleSync}
-                disabled={syncState !== "idle"}
+                // disabled={syncState !== "idle"}
+                disabled={demo || syncState !== "idle"}
                 className={[
                   "px-4 py-2 rounded-xl flex items-center gap-2 text-sm font-semibold shadow-sm transition",
                   "focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2",
@@ -431,6 +476,50 @@ const Dashboard = () => {
           </div>
         </div>
       </div>
+
+      {demo && (
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-4">
+          <div className="rounded-2xl border bg-yellow-50 p-3 flex items-center justify-between gap-3">
+            <div className="text-sm text-yellow-900">
+              <span className="font-extrabold">DEMO MODE</span> — showing sample data.
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setTourOpen(true)}
+                className="px-3 py-2 rounded-xl border bg-white hover:bg-yellow-100 text-sm font-semibold"
+              >
+                Start Tour
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  exitDemoMode();
+                  navigate("/", { replace: true });
+                }}
+                className="px-3 py-2 rounded-xl bg-gray-900 hover:bg-black text-white text-sm font-semibold"
+              >
+                Exit Demo
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  exitDemoMode();
+                  navigate("/login", { replace: true });
+                }}
+                className="px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold"
+              >
+                Connect Google Fit
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <DemoTourModal open={tourOpen} onClose={() => setTourOpen(false)} />
 
       {/* Page content */}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-5 pb-10 space-y-5">
@@ -648,7 +737,8 @@ const Dashboard = () => {
           </div>
 
           <div className="mt-4">
-            <SleepChart sleepSessions={sleepSessions} />
+            {/* <SleepChart sleepSessions={sleepSessions} /> */}
+            <SleepChart sleepSessions={sleepSessions} isDemo={demo} />
           </div>
         </div>
 

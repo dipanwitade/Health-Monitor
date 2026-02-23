@@ -1,15 +1,25 @@
-import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+// src/pages/Logout.jsx
+
+import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { exitDemoMode } from "../demo/demoMode"; 
 
 const Logout = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
+    
     localStorage.removeItem("user_email");
-    navigate('/login');
+    localStorage.removeItem("last_synced_at");
+
+    
+    exitDemoMode?.(); 
+
+    
+    navigate("/", { replace: true });
   }, [navigate]);
 
-  return null; 
+  return null;
 };
 
 export default Logout;

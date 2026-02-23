@@ -114,16 +114,23 @@ const ProfilePage = () => {
       <h1 className="text-2xl font-bold mb-4">My Profile</h1>
 
       {/* BASIC INFO */}
-      <div className="bg-white p-6 rounded-xl shadow mb-6 flex items-center gap-6">
-        {/* Circle with letter H */}
-        <div className="w-20 h-20 rounded-full bg-gray-400 flex items-center justify-center text-white text-2xl font-bold border">
-          H
+      
+      <div className="bg-white p-6 rounded-xl shadow mb-6 flex items-center gap-4 sm:gap-6">
+
+        <div className="w-20 h-20 shrink-0 rounded-full bg-gray-500 flex items-center justify-center text-white text-2xl font-bold border">
+          {(user.name?.trim()?.[0] || "U").toUpperCase()}
         </div>
 
-        <div>
-          <h2 className="text-xl font-semibold">{user.name || "User"}</h2>
-          <p className="text-gray-500">{user.email || "No email"}</p>
+        <div className="min-w-0">
+          <h2 className="text-xl font-semibold truncate">
+            {user.name || "User"}
+          </h2>
+          
+          <p className="text-gray-500 break-all">
+            {user.email || "No email"}
+          </p>
         </div>
+
       </div>
 
       {/* PERSONAL DETAILS */}
